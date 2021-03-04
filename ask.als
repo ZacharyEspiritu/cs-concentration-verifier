@@ -126,32 +126,30 @@ fact onePlan {
 
 -- ScBDegree
 
-fact ifScBDegree {
-	all p: Plan | {
-		p.degreeType = ScBDegree implies {
-			-- If ScB, two pathways
-			#(p.pathways) = 2
-	
-			-- If ScB, is there a capstone?
-			some p.capstone and p.capstone in p.courses
-			isCapstonableCourse[p.capstone]
-	
-			-- If ScB, is the capstone in one of the pathways?
-			p.capstone in p.pathways.assignedCourses
-		}
-	
-		-- Does the student have a 1000-level CS course that is not in one of the pathways?
-		some p.electives - (p.pathways.core + p.pathways.related)
-	
-		-- Are any 1000-level courses from outside CS in the list of approved courses?
-		-- I think this is covered implicity by the course definitions
+pred doesPlanSatisfyConcentration[p: Plan] {
+	p.degreeType = ScBDegree implies {
+		-- If ScB, two pathways
+		#(p.pathways) = 2
 
-		-- Taken allowed number of arts, society, and policy?
-		numberOfArtsSocialCourses[p.courses] <= 4
-	
+		-- If ScB, is there a capstone?
+		some p.capstone and p.capstone in p.courses
+		isCapstonableCourse[p.capstone]
+
+		-- If ScB, is the capstone in one of the pathways?
+		p.capstone in p.pathways.assignedCourses
+
 		-- Has 15 courses
 		#(p.courses) >= 15
 	}
+
+	-- Does the student have a 1000-level CS course that is not in one of the pathways?
+	some p.electives - (p.pathways.core + p.pathways.related)
+
+	-- Are any 1000-level courses from outside CS in the list of approved courses?
+	-- I think this is covered implicity by the course definition sigs?
+
+	-- Taken allowed number of arts, society, and policy?
+	numberOfArtsSocialCourses[p.courses] <= 4
 }
 
 -- Pathways
@@ -163,5 +161,8 @@ pred satisfiesPathway[p: Plan, core: Course, related: Course] {
 	#(p.courses & (core + related)) >= 2
 }
 
-run {} for 10 but 1 Plan, 200 Course, 5 int
+assert doesPlanSatisfyConcentration {
+	all p: Plan | 
+}
+check doesPlanSatisfyConcentration for 10 but 1 Plan, 200 Course, 5 int
 
