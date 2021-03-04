@@ -124,9 +124,7 @@ fact onePlan {
 	all p: Plan | SecurityPath in p.pathways and TheoryPath in p.pathways
 }
 
--- ScBDegree
-
-pred doesPlanSatisfyConcentration[p: Plan] {
+pred concentrationPlanSatisfiesRequirements[p: Plan] {
 	p.degreeType = ScBDegree implies {
 		-- If ScB, two pathways
 		#(p.pathways) = 2
@@ -142,6 +140,17 @@ pred doesPlanSatisfyConcentration[p: Plan] {
 		#(p.courses) >= 15
 	}
 
+	all pathway: p.pathways | let assigned = pathway.assignedCourses | {
+		-- has at least two pathway courses
+		#(assigned) = 2
+		-- assigned courses are all in courses
+		assigned in p.courses
+		-- Has at least one core course
+		some assigned & pathway.core
+		-- All assigned are valid pathway courses
+		assigned in (pathway.core + pathway.related)
+	}
+
 	-- Does the student have a 1000-level CS course that is not in one of the pathways?
 	some p.electives - (p.pathways.core + p.pathways.related)
 
@@ -154,15 +163,8 @@ pred doesPlanSatisfyConcentration[p: Plan] {
 
 -- Pathways
 
-pred satisfiesPathway[p: Plan, core: Course, related: Course] {
-	-- Core Courses
-	some p.courses & core
-	-- Related Courses
-	#(p.courses & (core + related)) >= 2
-}
-
 assert doesPlanSatisfyConcentration {
-	all p: Plan | 
+	some p: Plan | concentrationPlanSatisfiesRequirements[p]
 }
-check doesPlanSatisfyConcentration for 10 but 1 Plan, 200 Course, 5 int
+run { all p: Plan | concentrationPlanSatisfiesRequirements[p] } for 10 but 1 Plan, 200 Course, 5 int
 
