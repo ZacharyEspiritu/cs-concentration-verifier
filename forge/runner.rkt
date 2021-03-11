@@ -5,14 +5,360 @@
 (set-option! 'coregranularity 1)
 (set-option! 'core_minimization 'hybrid) ; try 'hybrid if slow
 
-(require "spec.rkt")
+(require "spec.rkt") ; the concentration requirement constraints
+
+(require json)
+(require racket/cmdline)
 (require racket/stream)
 
-(define bostonNeighbors (+ Boston Prov NYC)) ; (+ over a list)
+; These are a bunch of mappings from strings to Forge atom equivalents.
 
-(run findSource
-     #:preds[(some ([v Vertex])
-                   (source v))
-             (= (join Boston edges) bostonNeighbors)
-             (in (-> Boston Worc) edges)]
-     #:scope[(Vertex 5 5)])
+(define degree-type-mapping
+  (hash "Sc.B." ScBDegree
+        "A.B." ABDegree))
+
+(define pathway-mapping
+  (hash "MLPath" MLPath
+        "CompBioPath" CompBioPath
+        "ArchitecturePath" ArchitecturePath
+        "DataPath" DataPath
+        "DesignPath" DesignPath
+        "SecurityPath" SecurityPath
+        "SoftwarePath" SoftwarePath
+        "SystemsPath" SystemsPath
+        "TheoryPath" TheoryPath
+        "VisualCompPath" VisualCompPath))
+
+(define course-mapping
+  (hash "CSCI0020" CSCI0020
+        "CSCI0030" CSCI0030
+        "CSCI0040" CSCI0040
+        "CSCI0050" CSCI0050
+        "CSCI0060" CSCI0060
+        "CSCI0080" CSCI0080
+        "CSCI0090A" CSCI0090A
+        "CSCI0090B" CSCI0090B
+        "CSCI0090C" CSCI0090C
+        "CSCI0100" CSCI0100
+        "CSCI0111" CSCI0111
+        "CSCI0112" CSCI0112
+        "CSCI0130" CSCI0130
+        "CSCI0150" CSCI0150
+        "CSCI0160" CSCI0160
+        "CSCI0170" CSCI0170
+        "CSCI0180" CSCI0180
+        "CSCI0190" CSCI0190
+        "CSCI0220" CSCI0220
+        "CSCI0300" CSCI0300
+        "CSCI0310" CSCI0310
+        "CSCI0320" CSCI0320
+        "CSCI0330" CSCI0330
+        "CSCI0360" CSCI0360
+        "CSCI0450" CSCI0450
+        "CSCI0510" CSCI0510
+        "CSCI0530" CSCI0530
+        "CSCI0920" CSCI0920
+        "CSCI0931" CSCI0931
+        "CSCI1010" CSCI1010
+        "CSCI1230" CSCI1230
+        "CSCI1234" CSCI1234
+        "CSCI1250" CSCI1250
+        "CSCI1260" CSCI1260
+        "CSCI1270" CSCI1270
+        "CSCI1280" CSCI1280
+        "CSCI1290" CSCI1290
+        "CSCI1300" CSCI1300
+        "CSCI1301" CSCI1301
+        "CSCI1310" CSCI1310
+        "CSCI1320" CSCI1320
+        "CSCI1330" CSCI1330
+        "CSCI1340" CSCI1340
+        "CSCI1370" CSCI1370
+        "CSCI1380" CSCI1380
+        "CSCI1410" CSCI1410
+        "CSCI1420" CSCI1420
+        "CSCI1430" CSCI1430
+        "CSCI1440" CSCI1440
+        "CSCI1450" CSCI1450
+        "CSCI1460" CSCI1460
+        "CSCI1470" CSCI1470
+        "CSCI1480" CSCI1480
+        "CSCI1490" CSCI1490
+        "CSCI1510" CSCI1510
+        "CSCI1550" CSCI1550
+        "CSCI1570" CSCI1570
+        "CSCI1575" CSCI1575
+        "CSCI1580" CSCI1580
+        "CSCI1590" CSCI1590
+        "CSCI1600" CSCI1600
+        "CSCI1610" CSCI1610
+        "CSCI1620" CSCI1620
+        "CSCI1650" CSCI1650
+        "CSCI1660" CSCI1660
+        "CSCI1670" CSCI1670
+        "CSCI1680" CSCI1680
+        "CSCI1690" CSCI1690
+        "CSCI1695" CSCI1695
+        "CSCI1710" CSCI1710
+        "CSCI1729" CSCI1729
+        "CSCI1730" CSCI1730
+        "CSCI1760" CSCI1760
+        "CSCI1780" CSCI1780
+        "CSCI1800" CSCI1800
+        "CSCI1805" CSCI1805
+        "CSCI1810" CSCI1810
+        "CSCI1820" CSCI1820
+        "CSCI1850" CSCI1850
+        "CSCI1870" CSCI1870
+        "CSCI1900" CSCI1900
+        "CSCI1950E" CSCI1950E
+        "CSCI1950H" CSCI1950H
+        "CSCI1950I" CSCI1950I
+        "CSCI1950N" CSCI1950N
+        "CSCI1950Q" CSCI1950Q
+        "CSCI1950R" CSCI1950R
+        "CSCI1950S" CSCI1950S
+        "CSCI1950T" CSCI1950T
+        "CSCI1950U" CSCI1950U
+        "CSCI1950V" CSCI1950V
+        "CSCI1950W" CSCI1950W
+        "CSCI1950X" CSCI1950X
+        "CSCI1950Y" CSCI1950Y
+        "CSCI1950Z" CSCI1950Z
+        "CSCI1951A" CSCI1951A
+        "CSCI1951B" CSCI1951B
+        "CSCI1951C" CSCI1951C
+        "CSCI1951D" CSCI1951D
+        "CSCI1951E" CSCI1951E
+        "CSCI1951G" CSCI1951G
+        "CSCI1951H" CSCI1951H
+        "CSCI1951I" CSCI1951I
+        "CSCI1951J" CSCI1951J
+        "CSCI1951K" CSCI1951K
+        "CSCI1951L" CSCI1951L
+        "CSCI1951M" CSCI1951M
+        "CSCI1951N" CSCI1951N
+        "CSCI1951O" CSCI1951O
+        "CSCI1951R" CSCI1951R
+        "CSCI1951S" CSCI1951S
+        "CSCI1951T" CSCI1951T
+        "CSCI1951U" CSCI1951U
+        "CSCI1951V" CSCI1951V
+        "CSCI1951W" CSCI1951W
+        "CSCI1970" CSCI1970
+        "CSCI1971" CSCI1971
+        "CSCI1972" CSCI1972
+        "CSCI2000" CSCI2000
+        "CSCI2240" CSCI2240
+        "CSCI2270" CSCI2270
+        "CSCI2300" CSCI2300
+        "CSCI2310" CSCI2310
+        "CSCI2330" CSCI2330
+        "CSCI2340" CSCI2340
+        "CSCI2370" CSCI2370
+        "CSCI2390" CSCI2390
+        "CSCI2410" CSCI2410
+        "CSCI2420" CSCI2420
+        "CSCI2440" CSCI2440
+        "CSCI2470" CSCI2470
+        "CSCI2500A" CSCI2500A
+        "CSCI2500B" CSCI2500B
+        "CSCI2510" CSCI2510
+        "CSCI2520" CSCI2520
+        "CSCI2531" CSCI2531
+        "CSCI2540" CSCI2540
+        "CSCI2550" CSCI2550
+        "CSCI2560" CSCI2560
+        "CSCI2570" CSCI2570
+        "CSCI2580" CSCI2580
+        "CSCI2590" CSCI2590
+        "CSCI2730" CSCI2730
+        "CSCI2750" CSCI2750
+        "CSCI2820" CSCI2820
+        "CSCI2950C" CSCI2950C
+        "CSCI2950E" CSCI2950E
+        "CSCI2950G" CSCI2950G
+        "CSCI2950J" CSCI2950J
+        "CSCI2950K" CSCI2950K
+        "CSCI2950L" CSCI2950L
+        "CSCI2950O" CSCI2950O
+        "CSCI2950P" CSCI2950P
+        "CSCI2950Q" CSCI2950Q
+        "CSCI2950R" CSCI2950R
+        "CSCI2950T" CSCI2950T
+        "CSCI2950U" CSCI2950U
+        "CSCI2950V" CSCI2950V
+        "CSCI2950W" CSCI2950W
+        "CSCI2950X" CSCI2950X
+        "CSCI2950Z" CSCI2950Z
+        "CSCI2951A" CSCI2951A
+        "CSCI2951B" CSCI2951B
+        "CSCI2951C" CSCI2951C
+        "CSCI2951D" CSCI2951D
+        "CSCI2951E" CSCI2951E
+        "CSCI2951F" CSCI2951F
+        "CSCI2951G" CSCI2951G
+        "CSCI2951H" CSCI2951H
+        "CSCI2951I" CSCI2951I
+        "CSCI2951J" CSCI2951J
+        "CSCI2951K" CSCI2951K
+        "CSCI2951L" CSCI2951L
+        "CSCI2951M" CSCI2951M
+        "CSCI2951N" CSCI2951N
+        "CSCI2951O" CSCI2951O
+        "CSCI2951P" CSCI2951P
+        "CSCI2951Q" CSCI2951Q
+        "CSCI2951R" CSCI2951R
+        "CSCI2951S" CSCI2951S
+        "CSCI2951T" CSCI2951T
+        "CSCI2951U" CSCI2951U
+        "CSCI2951V" CSCI2951V
+        "CSCI2951W" CSCI2951W
+        "CSCI2951X" CSCI2951X
+        "CSCI2951Y" CSCI2951Y
+        "CSCI2951Z" CSCI2951Z
+        "CSCI2952A" CSCI2952A
+        "CSCI2952B" CSCI2952B
+        "CSCI2952C" CSCI2952C
+        "CSCI2952D" CSCI2952D
+        "CSCI2952E" CSCI2952E
+        "CSCI2952F" CSCI2952F
+        "CSCI2952G" CSCI2952G
+        "CSCI2952H" CSCI2952H
+        "CSCI2952I" CSCI2952I
+        "CSCI2952J" CSCI2952J
+        "CSCI2952K" CSCI2952K
+        "CSCI2952V" CSCI2952V
+        "CSCI2955" CSCI2955
+        "CSCI2956F" CSCI2956F
+        "CSCI2980" CSCI2980
+        "DATA0080" DATA0080
+        "DATA0200" DATA0200
+        "DATA1030" DATA1030
+        "DATA1050" DATA1050
+        "DATA2040" DATA2040
+        "DATA2050" DATA2050
+        "DATA2080" DATA2080
+        "MATH0520" MATH0520
+        "MATH0350" MATH0350
+        "MATH0540" MATH0540
+        "APMA1650" APMA1650
+        "APMA1655" APMA1655
+        "APMA1690" APMA1690
+        "APMA1170" APMA1170
+        "APMA1200" APMA1200
+        "APMA1210" APMA1210
+        "APMA1360" APMA1360
+        "APMA1660" APMA1660
+        "APMA1670" APMA1670
+        "APMA1710" APMA1710
+        "APMA1740" APMA1740
+        "PHP2630" PHP2630
+        "PHP2650" PHP2650
+        "CLPS1211" CLPS1211
+        "CLPS1342" CLPS1342
+        "CLPS1350" CLPS1350
+        "CLPS1491" CLPS1491
+        "CLPS1520" CLPS1520
+        "DEVL1810" DEVL1810
+        "ECON1110" ECON1110
+        "ECON1130" ECON1130
+        "ECON1160" ECON1160
+        "ECON1620" ECON1620
+        "ECON1630" ECON1630
+        "ECON1640" ECON1640
+        "ECON1660" ECON1660
+        "ECON1870" ECON1870
+        "ENGN1010" ENGN1010
+        "ENGN1570" ENGN1570
+        "ENGN1580" ENGN1580
+        "ENGN1600" ENGN1600
+        "ENGN1610" ENGN1610
+        "ENGN1630" ENGN1630
+        "ENGN1640" ENGN1640
+        "ENGN1650" ENGN1650
+        "ENGN1660" ENGN1660
+        "ENGN1931I" ENGN1931I
+        "ENGN2912E" ENGN2912E
+        "ENGN2912M" ENGN2912M
+        "MATH0100" MATH0100
+        "MATH1010" MATH1010
+        "MATH1040" MATH1040
+        "MATH1060" MATH1060
+        "MATH1110" MATH1110
+        "MATH1130" MATH1130
+        "MATH1230" MATH1230
+        "MATH1260" MATH1260
+        "MATH1270" MATH1270
+        "MATH1410" MATH1410
+        "MATH1530" MATH1530
+        "MATH1540" MATH1540
+        "MATH1560" MATH1560
+        "MATH1610" MATH1610
+        "MATH1620" MATH1620
+        "MUSC1210" MUSC1210
+        "NEUR1020" NEUR1020
+        "NEUR1030" NEUR1030
+        "NEUR1040" NEUR1040
+        "NEUR1650" NEUR1650
+        "NEUR1670" NEUR1670
+        "NEUR1680" NEUR1680
+        "PHIL1630" PHIL1630
+        "PHIL1880" PHIL1880
+        "PHIL1855" PHIL1855
+        "PHYS1600" PHYS1600
+        "PLCY1702X" PLCY1702X
+        "VISA1720" VISA1720))
+
+; Actual script starts here.
+
+(define (parse-json-file-path json-file-path)
+  (call-with-input-file json-file-path read-json))
+
+(define (get-courses-rel plan-data)
+  (map (lambda (course-data)
+         (let ([course-name (string-append (hash-ref course-data
+                                                     'subject_code)
+                                           (hash-ref course-data
+                                                     'course_number))]
+               [requirement-uuid (hash-ref course-data 'requirement_uuid)])
+           (hash-ref course-mapping course-name)))
+       (hash-ref plan-data 'plan_items)))
+
+(define (get-degree-type-rel plan-data)
+  (let ([degree-type-string (hash-ref (first (hash-ref plan-data
+                                                       'plan_items))
+                                      'degree_short)])
+    (hash-ref degree-type-mapping degree-type-string)))
+
+(define (process-json json-file-path)
+  (let* ([plan-data (parse-json-file-path json-file-path)]
+         [courses-rel (get-courses-rel plan-data)]
+         [degree-type-rel (get-degree-type-rel plan-data)])
+    (displayln courses-rel)
+    (displayln degree-type-rel)
+    (check-concentration courses-rel degree-type-rel)))
+
+(define paths (+ SystemsPath TheoryPath))
+
+(define (check-concentration courses-rel degree-type-rel)
+  (begin
+    (run verify-plan
+         #:preds[(one Plan)
+                 (some ([p Plan])
+                       (and (concentrationPlanSatisfiesRequirements p)
+                            (= (join p degreeType) degree-type-rel)
+                            (= (join p courses) (+ courses-rel))
+                            (= (join p pathways) paths)
+                            (= (join p capstone) CSCI1660)
+                            (= (join p electives) (+ CSCI1575 CSCI1970 CSCI1970 CSCI1230))))
+                 (= (join SystemsPath assignedCourses) (+ CSCI1660 CSCI1670))
+                 (= (join TheoryPath assignedCourses) (+ CSCI1570 CSCI1950Y))] ; or (none (join p capstone))
+         #:scope[])
+    (is-sat? verify-plan)))
+
+(command-line
+ #:usage-help
+ "Checks if a ASK JSON export is a valid CS concentration."
+ #:args (json-file-path)
+ (process-json json-file-path))

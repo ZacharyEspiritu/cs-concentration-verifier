@@ -1,8 +1,17 @@
 #lang forge
 
+/*
+    This should be the canonical list of courses that are permitted to appear
+    in a CS declaration.
+
+    For the time being, this is declared as a `one sig` so only one instance of
+    a given course exists in a plan, which is satisfactory for the requirements
+    we need to check with this script. However, if we want to expand this to,
+    say, synthesis, we should try to remove this `one` restriction (though this
+    dramatically increases the runtime of the solver).
+ */
 abstract sig Course {}
-one sig APMA1650, APMA1655,
-CSCI0020, CSCI0030, CSCI0040, CSCI0050, CSCI0060, CSCI0080,
+one sig CSCI0020, CSCI0030, CSCI0040, CSCI0050, CSCI0060, CSCI0080,
 CSCI0090A, CSCI0090B, CSCI0090C, CSCI0100, CSCI0111,
 CSCI0112, CSCI0130, CSCI0150, CSCI0160, CSCI0170, CSCI0180,
 CSCI0190, CSCI0220, CSCI0300, CSCI0310, CSCI0320, CSCI0330,
@@ -37,8 +46,24 @@ CSCI2951Z, CSCI2952A, CSCI2952B, CSCI2952C, CSCI2952D, CSCI2952E,
 CSCI2952F, CSCI2952G, CSCI2952H, CSCI2952I, CSCI2952J, CSCI2952K,
 CSCI2952V, CSCI2955, CSCI2956F, CSCI2980,
 DATA0080, DATA0200, DATA1030, DATA1050, DATA2040, DATA2050,
-DATA2080, MATH0520, MATH0350, MATH0540,
-ENGN1610, ENGN1640, CLPS1520 extends Course {}
+DATA2080,
+APMA1650, APMA1655, APMA1690, APMA1170, APMA1200, APMA1210, APMA1360,
+APMA1660, APMA1670, APMA1710, APMA1740,
+PHP2630, PHP2650,
+CLPS1211, CLPS1342, CLPS1350, CLPS1491, CLPS1520,
+DEVL1810,
+ECON1110, ECON1130, ECON1160, ECON1620, ECON1630, ECON1640, ECON1660,
+ECON1870, ENGN1010, ENGN1570, ENGN1610, ENGN1580, ENGN1600, ENGN1630, ENGN1640,
+ENGN1650, ENGN1660, ENGN2912E, ENGN2912M, ENGN1931I,
+MATH0100, MATH0520, MATH0350, MATH0540,
+MATH1010, MATH1040, MATH1060, MATH1110, MATH1130, MATH1230, MATH1260,
+MATH1270, MATH1410, MATH1530, MATH1540, MATH1560, MATH1610, MATH1620,
+MUSC1210,
+NEUR1020, NEUR1030, NEUR1040, NEUR1650, NEUR1670, NEUR1680,
+PHIL1630, PHIL1880, PHIL1855,
+PHYS1600,
+PLCY1702X,
+VISA1720 extends Course {}
 
 abstract sig Pathway {
     assignedCourses: set Course,
@@ -63,8 +88,8 @@ pred isCapstonableCourse[c: Course] {
     CSCI1440 +
     CSCI1470 +
     CSCI1600 +
-    CSCI1620 +
-    CSCI1690 +
+    CSCI1660 + -- do you want to check for existence of CSCI1620?
+    CSCI1670 + -- do you want to check for existence of CSCI1690?
     CSCI1680 +
     CSCI1760 +
     CSCI1950Y +
@@ -130,17 +155,6 @@ pred concentrationPlanSatisfiesRequirements[p: Plan] {
 
     -- Pathway Related Requirements
 
-    all pathway: p.pathways | let assigned = pathway.assignedCourses | {
-        -- Has at least two pathway courses
-        #(assigned) = 2
-        -- Assigned courses are all in courses
-        assigned in p.courses
-        -- Has at least one core course
-        some assigned & (pathway.core + pathway.graduate)
-        -- All assigned are valid pathway courses
-        assigned in (pathway.core + pathway.related + pathway.graduate)
-    }
-
     satisfiesMLPathRequirements[p]
     satisfiesCompBioPathRequirements[p]
     satisfiesArchitecturePathRequirements[p]
@@ -151,6 +165,19 @@ pred concentrationPlanSatisfiesRequirements[p: Plan] {
     satisfiesSystemsPathRequirements[p]
     satisfiesTheoryPathRequirements[p]
     satisfiesVisualCompPathRequirements[p]
+
+    all pathway: p.pathways | let assigned = pathway.assignedCourses | {
+        -- Has two pathway courses
+        #(assigned) = 2
+        -- Assigned courses are all in courses
+        assigned in p.courses
+        -- Assigned courses are not in an elective
+        assigned not in p.electives
+        -- Has at least one core course
+        some assigned & (pathway.core + pathway.graduate)
+        -- All assigned are valid pathway courses
+        assigned in (pathway.core + pathway.related + pathway.graduate)
+    }
 }
 
 -- Pathways
@@ -158,7 +185,7 @@ pred concentrationPlanSatisfiesRequirements[p: Plan] {
 pred satisfiesMLPathRequirements[p: Plan] {
     MLPath.core = (CSCI1410 + CSCI1420 + CSCI1430 + CSCI1460 + CSCI1470 + CSCI1850 + CSCI1951R)
     MLPath.related = (CSCI1550 + CSCI1951A + CSCI1951C + CSCI1951K + ENGN1610)
-    MLPath.graduate = (CSCI2410 + CSCI2420 + CSCI2440 + CSCI2470 + CSCI2540 + CSCICSCI + CSCI2951C + CSCI2951F + CSCI2951I + CSCI2951K + CSCI2951W + CSCI2951X + CSCI2951Z + CSCI2952C + CSCI2952D + CSCI2952G + CSCI2952K + CSCI2955)
+    MLPath.graduate = (CSCI2410 + CSCI2420 + CSCI2440 + CSCI2470 + CSCI2540 + CSCI2950K + CSCI2951C + CSCI2951F + CSCI2951I + CSCI2951K + CSCI2951W + CSCI2951X + CSCI2951Z + CSCI2952C + CSCI2952D + CSCI2952G + CSCI2952K + CSCI2955)
     MLPath in p.pathways implies {
         some p.courses & (APMA1650 + APMA1655 + CSCI1450)
         containsLinearAlgebra[p.courses]
@@ -261,8 +288,3 @@ pred satisfiesVisualCompPathRequirements[p: Plan] {
 pred containsLinearAlgebra[cs: Course] {
     some cs & (CSCI0530 + MATH0520 + MATH0540)
 }
-
--- run {
---     one Plan
---     all p: Plan | ScBDegree in p.degreeType and SecurityPath in p.pathways and TheoryPath in p.pathways and concentrationPlanSatisfiesRequirements[p]
--- } for 2 but 4 Int
