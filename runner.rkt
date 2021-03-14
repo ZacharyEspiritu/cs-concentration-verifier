@@ -32,7 +32,23 @@
         "Self-Designed Pathway" SelfDesignedPath))
 
 (define course-mapping
-  (hash "CSCI0020" CSCI0020
+  (hash "APMA1170" APMA1170
+        "APMA1200" APMA1200
+        "APMA1210" APMA1210
+        "APMA1360" APMA1360
+        "APMA1650" APMA1650
+        "APMA1655" APMA1655
+        "APMA1660" APMA1660
+        "APMA1670" APMA1670
+        "APMA1690" APMA1690
+        "APMA1710" APMA1710
+        "APMA1740" APMA1740
+        "CLPS1211" CLPS1211
+        "CLPS1342" CLPS1342
+        "CLPS1350" CLPS1350
+        "CLPS1491" CLPS1491
+        "CLPS1520" CLPS1520
+        "CSCI0020" CSCI0020
         "CSCI0030" CSCI0030
         "CSCI0040" CSCI0040
         "CSCI0050" CSCI0050
@@ -241,27 +257,6 @@
         "DATA2040" DATA2040
         "DATA2050" DATA2050
         "DATA2080" DATA2080
-        "MATH0520" MATH0520
-        "MATH0350" MATH0350
-        "MATH0540" MATH0540
-        "APMA1650" APMA1650
-        "APMA1655" APMA1655
-        "APMA1690" APMA1690
-        "APMA1170" APMA1170
-        "APMA1200" APMA1200
-        "APMA1210" APMA1210
-        "APMA1360" APMA1360
-        "APMA1660" APMA1660
-        "APMA1670" APMA1670
-        "APMA1710" APMA1710
-        "APMA1740" APMA1740
-        "PHP2630" PHP2630
-        "PHP2650" PHP2650
-        "CLPS1211" CLPS1211
-        "CLPS1342" CLPS1342
-        "CLPS1350" CLPS1350
-        "CLPS1491" CLPS1491
-        "CLPS1520" CLPS1520
         "DEVL1810" DEVL1810
         "ECON1110" ECON1110
         "ECON1130" ECON1130
@@ -284,6 +279,11 @@
         "ENGN2912E" ENGN2912E
         "ENGN2912M" ENGN2912M
         "MATH0100" MATH0100
+        "MATH0180" MATH0180
+        "MATH0200" MATH0200
+        "MATH0350" MATH0350
+        "MATH0520" MATH0520
+        "MATH0540" MATH0540
         "MATH1010" MATH1010
         "MATH1040" MATH1040
         "MATH1060" MATH1060
@@ -306,13 +306,17 @@
         "NEUR1670" NEUR1670
         "NEUR1680" NEUR1680
         "PHIL1630" PHIL1630
-        "PHIL1880" PHIL1880
         "PHIL1855" PHIL1855
+        "PHIL1880" PHIL1880
+        "PHP2630" PHP2630
+        "PHP2650" PHP2650
         "PHYS1600" PHYS1600
         "PLCY1702X" PLCY1702X
         "VISA1720" VISA1720))
 
 ; Actual script starts here.
+
+(define debug-mode (make-parameter #f))
 
 (define (parse-json-file-path json-file-path)
   (call-with-input-file json-file-path read-json))
@@ -334,7 +338,7 @@
           [else
            ; recursively get uuids
            (let* ([defs-list
-                   (hash-ref requirement-data 'requirement_definitions)]
+                    (hash-ref requirement-data 'requirement_definitions)]
                   [results-list
                    (map (lambda (x)
                           (get-list-of-single-explicit-uuids x exclusion-list))
@@ -427,27 +431,27 @@
 (define (get-courses-rel plan-data requirement-uuid-map)
   (foldl (lambda (course-data current-hash)
            (let* ([course-name (string-append (hash-ref course-data
-                                                     'subject_code)
-                                           (hash-ref course-data
-                                                     'course_number))]
-                [course-rel (hash-ref course-mapping course-name)]
+                                                        'subject_code)
+                                              (hash-ref course-data
+                                                        'course_number))]
+                  [course-rel (hash-ref course-mapping course-name)]
 
-                [requirement-uuid (hash-ref course-data 'requirement_uuid)]
-                [requirement-name (hash-ref requirement-uuid-map requirement-uuid "")]
+                  [requirement-uuid (hash-ref course-data 'requirement_uuid)]
+                  [requirement-name (hash-ref requirement-uuid-map requirement-uuid "")]
 
-                [new-hash1
-                 (hash-set current-hash
-                           "Courses"
-                           (cons course-rel
-                                 (hash-ref current-hash "Courses" empty)))]
-                [new-hash2
-                 (hash-set new-hash1
-                           requirement-name
-                           (cons course-rel
-                                 (hash-ref new-hash1 requirement-name empty)))])
-           new-hash2))
-       (hash)
-       (hash-ref plan-data 'plan_items))) ; courses-rel
+                  [new-hash1
+                   (hash-set current-hash
+                             "Courses"
+                             (cons course-rel
+                                   (hash-ref current-hash "Courses" empty)))]
+                  [new-hash2
+                   (hash-set new-hash1
+                             requirement-name
+                             (cons course-rel
+                                   (hash-ref new-hash1 requirement-name empty)))])
+             new-hash2))
+         (hash)
+         (hash-ref plan-data 'plan_items))) ; courses-rel
 
 (define (get-degree-type-rel plan-data)
   (let ([degree-type-string (hash-ref (first (hash-ref plan-data
@@ -466,25 +470,45 @@
   (let ([pathway-rel-list
          (for/fold ([result empty])
                    ([pathway-str (hash-keys pathway-mapping)])
-            (if (member pathway-str (hash-keys courses-rel-map))
-                (cons (hash-ref pathway-mapping pathway-str) result)
-                result))])
+           (if (member pathway-str (hash-keys courses-rel-map))
+               (cons (hash-ref pathway-mapping pathway-str) result)
+               result))])
     pathway-rel-list))
 
+(define-syntax-rule (make-pathway-constraint pathway-str courses-rel-map)
+  (let* ([pathway-rel (hash-ref pathway-mapping pathway-str)]
+         [assigned-rel (join pathway-rel assignedCourses)])
+    (if (member pathway-str (hash-keys courses-rel-map))
+        (= assigned-rel (let ([courses-in-path-rel (hash-ref courses-rel-map pathway-str)])
+                          (when (debug-mode)
+                            (printf "    ~s: ~s\n" pathway-str courses-in-path-rel))
+                          (if (equal? 1 (length courses-in-path-rel)) ; note for Tim; doing this weird thing because can't use < inside of Forge macro context
+                              (first courses-in-path-rel)
+                              (+ courses-in-path-rel))))
+        (not (some assigned-rel)))))
+
+(define (debug-output courses-rel-map degree-type-rel)
+  (printf "Courses: ~s\n" (hash-ref courses-rel-map "Courses"))
+  (printf "Electives: ~s\n" (hash-ref courses-rel-map "Additional Courses"))
+  (printf "Capstone: ~s\n"
+          (if (hash-has-key? courses-rel-map "Capstone Course")
+              (hash-ref courses-rel-map "Capstone Course")
+              "n/a"))
+  (printf "Pathways: ~s\n" (get-pathways-rel-list courses-rel-map)))
+
 (define (check-concentration courses-rel-map degree-type-rel)
-  (displayln (first (hash-ref courses-rel-map "Capstone Course")))
-  (displayln (hash-ref courses-rel-map "Courses"))
-  (displayln (hash-ref courses-rel-map "Additional Courses"))
-  (displayln (get-pathways-rel-list courses-rel-map))
-  (displayln "Done")
+  (when (debug-mode)
+    (debug-output courses-rel-map degree-type-rel))
   (begin
     ; This is kind of messy, but unfortunately it seems that you need to
     ; generate constraints within #:preds, otherwise the macro expansion for
     ; Forge does not work.
     (run verify-plan
-         #:preds[(one Plan)
+         #:preds[; one Plan
+                 (one Plan)
+                 ; some p: Plan | ...
                  (some ([p Plan])
-                            ; concentrationPlanSatisfiesRequirements[p]
+                       ; concentrationPlanSatisfiesRequirements[p]
                        (and (concentrationPlanSatisfiesRequirements p)
                             ; p.degreeType = ...
                             (= (join p degreeType) degree-type-rel)
@@ -496,15 +520,30 @@
                             (= (join p electives) (+ (hash-ref courses-rel-map "Additional Courses")))
                             ; p.capstone = ... (OR) none p.capstone
                             (if (hash-has-key? courses-rel-map "Capstone Course")
-                              (= (join p capstone) (first (hash-ref courses-rel-map "Capstone Course")))
-                              (not (some (join p capstone))))))
-                 (= (join SystemsPath assignedCourses) (+ CSCI1660 CSCI1670))
-                 (= (join TheoryPath assignedCourses) (+ CSCI1570 CSCI1950Y))] ; or (none (join p capstone))
+                                (= (join p capstone) (first (hash-ref courses-rel-map "Capstone Course")))
+                                (not (some (join p capstone))))))
+                 ; This looks really messy, but it seems to because you have to
+                 ; work in macro-land and so you can't fold over the list of
+                 ; pathways, etc. Something to improve in the future.
+                 (make-pathway-constraint "Systems" courses-rel-map)
+                 (make-pathway-constraint "Software Principles" courses-rel-map)
+                 (make-pathway-constraint "Data" courses-rel-map)
+                 (make-pathway-constraint "Artificial Intelligence/Machine Learning" courses-rel-map)
+                 (make-pathway-constraint "Theory" courses-rel-map)
+                 (make-pathway-constraint "Security" courses-rel-map)
+                 (make-pathway-constraint "Visual Computing" courses-rel-map)
+                 (make-pathway-constraint "Computer Architecture" courses-rel-map)
+                 (make-pathway-constraint "Computational Biology" courses-rel-map)
+                 (make-pathway-constraint "Design" courses-rel-map)
+                 (make-pathway-constraint "Self-Designed Pathway" courses-rel-map)]
          #:scope[])
     (is-sat? verify-plan)))
 
 (command-line
  #:usage-help
  "Checks if a ASK JSON export is a valid CS concentration."
+ #:once-each
+ [("-d" "--debug") "Prints out some debug information"
+                   (debug-mode #t)]
  #:args (json-file-path)
  (process-json json-file-path))
