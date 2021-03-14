@@ -1,3 +1,7 @@
+# cs-concentration-verifier
+
+A [Forge](https://github.com/tnelson/Forge/)-based script for verifying Brown CS concentrations.
+
 ## Usage
 
 Make sure `runner.rkt` and `spec.rkt` are in the same directory, then from within that directory, run:
