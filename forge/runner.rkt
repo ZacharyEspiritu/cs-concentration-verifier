@@ -10,6 +10,7 @@
 (require json)
 (require racket/cmdline)
 (require racket/stream)
+(require racket/hash)
 
 ; These are a bunch of mappings from strings to Forge atom equivalents.
 
@@ -18,16 +19,17 @@
         "A.B." ABDegree))
 
 (define pathway-mapping
-  (hash "MLPath" MLPath
-        "CompBioPath" CompBioPath
-        "ArchitecturePath" ArchitecturePath
-        "DataPath" DataPath
-        "DesignPath" DesignPath
-        "SecurityPath" SecurityPath
-        "SoftwarePath" SoftwarePath
-        "SystemsPath" SystemsPath
-        "TheoryPath" TheoryPath
-        "VisualCompPath" VisualCompPath))
+  (hash "Systems" SystemsPath
+        "Software Principles" SoftwarePath
+        "Data" DataPath
+        "Artificial Intelligence/Machine Learning" MLPath
+        "Theory" TheoryPath
+        "Security" SecurityPath
+        "Visual Computing" VisualCompPath
+        "Computer Architecture" ArchitecturePath
+        "Computational Biology" CompBioPath
+        "Design" DesignPath
+        "Self-Designed Pathway" SelfDesignedPath))
 
 (define course-mapping
   (hash "CSCI0020" CSCI0020
@@ -315,15 +317,137 @@
 (define (parse-json-file-path json-file-path)
   (call-with-input-file json-file-path read-json))
 
-(define (get-courses-rel plan-data)
-  (map (lambda (course-data)
-         (let ([course-name (string-append (hash-ref course-data
+(define (find-requirement-with-title defs-list requirement-title)
+  (first (filter (lambda (requirement-data)
+                   (let ([title (hash-ref requirement-data 'title)])
+                     (string=? title requirement-title))) defs-list)))
+
+; recursively finds "type":"single-explicit"
+(define (get-list-of-single-explicit-uuids requirement-data exclusion-list)
+  (let* ([requirement-type (hash-ref requirement-data 'type "unknown")]
+         [requirement-title (hash-ref requirement-data 'title)])
+    (if (member requirement-title exclusion-list)
+        empty
+        (case requirement-type
+          [("single-explicit" "single-narrative" "single-pattern" "non-course")
+           (list (hash-ref requirement-data 'requirement_uuid))]
+          [else
+           ; recursively get uuids
+           (let* ([defs-list
+                   (hash-ref requirement-data 'requirement_definitions)]
+                  [results-list
+                   (map (lambda (x)
+                          (get-list-of-single-explicit-uuids x exclusion-list))
+                        defs-list)])
+             (apply append results-list))]))))
+
+(define (get-list-of-uuids-for-title requirement-list title exclusion-list)
+  (get-list-of-single-explicit-uuids
+   (find-requirement-with-title requirement-list
+                                title)
+   exclusion-list))
+
+(define (build-mapping-uuid-hash requirement-list title exclusion-list)
+  (foldl (lambda (x result)
+           (hash-set result x title))
+         (hash)
+         (get-list-of-uuids-for-title requirement-list title exclusion-list)))
+
+; TODO: Clean this messy function up
+(define (preprocess-requirement-uuids plan-data)
+  (let* ([defs-list (hash-ref plan-data 'program_definitions)]
+         [cs-conc-def (first defs-list)]
+         [requirement-list (hash-ref cs-conc-def 'requirements)]
+
+         ; Parse lists of uuids
+         [calculus-uuids
+          (build-mapping-uuid-hash requirement-list
+                                   "Calculus Prerequisite" empty)]
+         [intro-uuids
+          (build-mapping-uuid-hash requirement-list
+                                   "Introductory Courses" empty)]
+         [intermediate-uuids
+          (build-mapping-uuid-hash requirement-list
+                                   "Intermediate Courses" empty)]
+         [elective-uuids
+          (build-mapping-uuid-hash requirement-list
+                                   "Additional Courses" empty)]
+         [capstone-uuids
+          (build-mapping-uuid-hash requirement-list
+                                   "Capstone Course" empty)]
+
+         ; pathway parsing
+         [pathway-list
+          (hash-ref (find-requirement-with-title
+                     (hash-ref (find-requirement-with-title requirement-list
+                                                            "Pathways")
+                               'requirement_definitions)
+                     "Pathways")
+                    'requirement_definitions)]
+         [requirements-to-ignore (list "Intermediate Courses")]
+         [systems-uuids
+          (build-mapping-uuid-hash pathway-list "Systems" requirements-to-ignore)]
+         [software-uuids
+          (build-mapping-uuid-hash pathway-list "Software Principles" requirements-to-ignore)]
+         [data-uuids
+          (build-mapping-uuid-hash pathway-list "Data" requirements-to-ignore)]
+         [ai-ml-uuids
+          (build-mapping-uuid-hash pathway-list "Artificial Intelligence/Machine Learning" requirements-to-ignore)]
+         [theory-uuids
+          (build-mapping-uuid-hash pathway-list "Theory" requirements-to-ignore)]
+         [security-uuids
+          (build-mapping-uuid-hash pathway-list "Security" requirements-to-ignore)]
+         [visual-uuids
+          (build-mapping-uuid-hash pathway-list "Visual Computing" requirements-to-ignore)]
+         [arch-uuids
+          (build-mapping-uuid-hash pathway-list "Computer Architecture" requirements-to-ignore)]
+         [comp-biol-uuids
+          (build-mapping-uuid-hash pathway-list "Computational Biology" requirements-to-ignore)]
+         [design-uuids
+          (build-mapping-uuid-hash pathway-list "Design" requirements-to-ignore)]
+         [self-designed-uuids
+          (build-mapping-uuid-hash pathway-list "Self-Designed Pathway" requirements-to-ignore)])
+    (hash-union calculus-uuids
+                intro-uuids
+                intermediate-uuids
+                elective-uuids
+                capstone-uuids
+                systems-uuids
+                software-uuids
+                data-uuids
+                ai-ml-uuids
+                theory-uuids
+                security-uuids
+                visual-uuids
+                arch-uuids
+                comp-biol-uuids
+                design-uuids
+                self-designed-uuids)))
+
+(define (get-courses-rel plan-data requirement-uuid-map)
+  (foldl (lambda (course-data current-hash)
+           (let* ([course-name (string-append (hash-ref course-data
                                                      'subject_code)
                                            (hash-ref course-data
                                                      'course_number))]
-               [requirement-uuid (hash-ref course-data 'requirement_uuid)])
-           (hash-ref course-mapping course-name)))
-       (hash-ref plan-data 'plan_items)))
+                [course-rel (hash-ref course-mapping course-name)]
+
+                [requirement-uuid (hash-ref course-data 'requirement_uuid)]
+                [requirement-name (hash-ref requirement-uuid-map requirement-uuid "")]
+
+                [new-hash1
+                 (hash-set current-hash
+                           "Courses"
+                           (cons course-rel
+                                 (hash-ref current-hash "Courses" empty)))]
+                [new-hash2
+                 (hash-set new-hash1
+                           requirement-name
+                           (cons course-rel
+                                 (hash-ref new-hash1 requirement-name empty)))])
+           new-hash2))
+       (hash)
+       (hash-ref plan-data 'plan_items))) ; courses-rel
 
 (define (get-degree-type-rel plan-data)
   (let ([degree-type-string (hash-ref (first (hash-ref plan-data
@@ -333,25 +457,47 @@
 
 (define (process-json json-file-path)
   (let* ([plan-data (parse-json-file-path json-file-path)]
-         [courses-rel (get-courses-rel plan-data)]
+         [requirement-uuid-map (preprocess-requirement-uuids plan-data)]
+         [courses-rel (get-courses-rel plan-data requirement-uuid-map)]
          [degree-type-rel (get-degree-type-rel plan-data)])
-    (displayln courses-rel)
-    (displayln degree-type-rel)
     (check-concentration courses-rel degree-type-rel)))
 
-(define paths (+ SystemsPath TheoryPath))
+(define (get-pathways-rel-list courses-rel-map)
+  (let ([pathway-rel-list
+         (for/fold ([result empty])
+                   ([pathway-str (hash-keys pathway-mapping)])
+            (if (member pathway-str (hash-keys courses-rel-map))
+                (cons (hash-ref pathway-mapping pathway-str) result)
+                result))])
+    pathway-rel-list))
 
-(define (check-concentration courses-rel degree-type-rel)
+(define (check-concentration courses-rel-map degree-type-rel)
+  (displayln (first (hash-ref courses-rel-map "Capstone Course")))
+  (displayln (hash-ref courses-rel-map "Courses"))
+  (displayln (hash-ref courses-rel-map "Additional Courses"))
+  (displayln (get-pathways-rel-list courses-rel-map))
+  (displayln "Done")
   (begin
+    ; This is kind of messy, but unfortunately it seems that you need to
+    ; generate constraints within #:preds, otherwise the macro expansion for
+    ; Forge does not work.
     (run verify-plan
          #:preds[(one Plan)
                  (some ([p Plan])
+                            ; concentrationPlanSatisfiesRequirements[p]
                        (and (concentrationPlanSatisfiesRequirements p)
+                            ; p.degreeType = ...
                             (= (join p degreeType) degree-type-rel)
-                            (= (join p courses) (+ courses-rel))
-                            (= (join p pathways) paths)
-                            (= (join p capstone) CSCI1660)
-                            (= (join p electives) (+ CSCI1575 CSCI1970 CSCI1970 CSCI1230))))
+                            ; p.courses = ...
+                            (= (join p courses) (+ (hash-ref courses-rel-map "Courses")))
+                            ; p.pathways = ...
+                            (= (join p pathways) (+ (get-pathways-rel-list courses-rel-map)))
+                            ; p.electives = ...
+                            (= (join p electives) (+ (hash-ref courses-rel-map "Additional Courses")))
+                            ; p.capstone = ... (OR) none p.capstone
+                            (if (hash-has-key? courses-rel-map "Capstone Course")
+                              (= (join p capstone) (first (hash-ref courses-rel-map "Capstone Course")))
+                              (not (some (join p capstone))))))
                  (= (join SystemsPath assignedCourses) (+ CSCI1660 CSCI1670))
                  (= (join TheoryPath assignedCourses) (+ CSCI1570 CSCI1950Y))] ; or (none (join p capstone))
          #:scope[])

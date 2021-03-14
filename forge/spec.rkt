@@ -72,7 +72,7 @@ abstract sig Pathway {
     graduate: set Course
 }
 one sig MLPath, CompBioPath, ArchitecturePath, DataPath, DesignPath,
-SecurityPath, SoftwarePath, SystemsPath, TheoryPath, VisualCompPath extends Pathway {}
+SecurityPath, SoftwarePath, SystemsPath, TheoryPath, VisualCompPath, SelfDesignedPath extends Pathway {}
 
 pred isCapstonableCourse[c: Course] {
     c in (CSCI1234 +
@@ -96,6 +96,7 @@ pred isCapstonableCourse[c: Course] {
     CSCI1951A +
     CSCI1951I +
     CSCI1951U +
+    CSCI1970 +
     CSCI2240 +
     CSCI2370 +
     CSCI2390 +
